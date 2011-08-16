@@ -9,6 +9,8 @@ RottenEgg is a tool to upload SCM(svn|git) files via FTP.
 == Installation
 For <b>Non-Windows</b> install
     gem install rottenegg
+or
+    gem install rottenegg --pre
 
 For <b>Windows</b> install,maybe need DevelopmentKit[https://github.com/oneclick/rubyinstaller/wiki/Development-Kit], follow the instructions.
     install thin:
@@ -19,6 +21,7 @@ For <b>Windows</b> install,maybe need DevelopmentKit[https://github.com/oneclick
         gem install tmail
     finally:
         gem install rottenegg
+        gem install rottenegg --pre
 
 == Getting Started
 
