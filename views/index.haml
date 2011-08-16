@@ -1,0 +1,490 @@
+:javascript
+  Ext.require(['*']);
+  Ext.onReady(function() {
+      Ext.QuickTips.init();
+      var apps_tree, running=#{settings.running_status.to_s}, refreshStatusTimerId;
+      var treePanelId = Ext.id(), txtSelectedAppId = Ext.id(), btnsGroupId = Ext.id(), btnRemoveAppId = Ext.id(), btnRunAppId = Ext.id(), gridId = Ext.id(), comboActionModeId = Ext.id(), comboStatusId = Ext.id(), logWinId = Ext.id();
+
+      var apps_store = Ext.create('Ext.data.TreeStore', {
+          proxy: {
+              type: 'ajax',
+              url: 'apps_list'
+          },
+          reader: {
+              type: 'json'
+          },
+          root: {
+              text: 'apps',
+              id: 'root',
+              expanded: true
+          },
+          clearOnPageLoad: true,
+          folderSort: true,
+          autoLoad: true,
+          autoSync: true
+      });
+
+      var files_store = new Ext.data.Store({
+          proxy: {
+              type: 'ajax',
+              url : '/files',
+              reader: {
+                  type: 'json',
+                  root: 'files',
+                  successProperty :'success',
+                  totalProperty: 'total',
+                  extraParams: {
+                      action_mode: 'ALL',
+                      status: 'ALL'
+                  }
+              }
+          },
+          fields: [
+              {name: 'action',    type: 'string'},
+              {name: 'filename',  type: 'string'},
+              {name: 'status',    type: 'string'}
+          ],
+          pageSize: #{settings.paging_size}
+      });
+
+      loadFiles = function() {
+          files_store.load();
+      };
+
+      setPanel = function(name, disabled) {
+          if (disabled) {
+            Ext.getCmp(btnsGroupId).setDisabled(true);
+            Ext.getCmp(btnRunAppId).setText("running");
+            Ext.getCmp(treePanelId).setTitle("Apps <font color='green'>" + name + "</font><font color='blue'> is running...</font>");
+          } else {
+            Ext.getCmp(btnsGroupId).setDisabled(false);
+            Ext.getCmp(btnRunAppId).setText("run!");
+            Ext.getCmp(treePanelId).setTitle("Apps");
+          }
+      };
+
+      turnoffRunning = function() {
+          Ext.Ajax.request({
+              method: 'GET',
+              timeout: 60 * 1000,
+              url: 'turnoff',
+              success: function(response) {
+
+              }
+          });
+      }
+
+      refreshLog = function() {
+          Ext.Ajax.request({
+              method: 'GET',
+              timeout: 60 * 1000,
+              url: 'logs',
+              success: function(response) {
+                  if (Ext.String.trim(response.responseText) != '') {
+                      Ext.getCmp(logWinId).setValue(Ext.getCmp(logWinId).value + Ext.String.trim(response.responseText));
+                      if (response.responseText.indexOf('Remote ftp server is down') > 0) {
+                        running = false;
+                        window.clearTimeout(refreshStatusTimerId);
+                        turnoffRunning();
+                        loadFiles();
+                        Ext.MessageBox.alert("", "Ftp server is down!");
+                        setPanel('', false);
+                        apps_tree.getStore().load();
+                      };
+                  }
+              }
+          });
+      };
+
+      checkRunningStatus = function() {
+          Ext.Ajax.request({
+              method: 'GET',
+              timeout: 60 * 1000,
+              url: 'running_status',
+              success: function(response) {
+                  if (Ext.String.trim(response.responseText) == 'false') {
+                      running = false;
+                      window.clearTimeout(refreshStatusTimerId);
+                      Ext.MessageBox.alert("", "Run completed!");
+                      //Ext.getCmp(logWinId).setValue('');
+                      setPanel('', false);
+                      apps_tree.getStore().load();
+                      loadFiles();
+                      refreshLog();
+                  }
+              },
+              failure: function(response) {
+                  running = false;
+              }
+          });
+      };
+
+      refreshStatus = function() {
+          if (running) {
+              loadFiles();
+              refreshLog();
+              checkRunningStatus();
+              refreshStatusTimerId = window.setTimeout(refreshStatus, 1000 * 10);
+          } else {
+              window.clearTimeout(refreshStatusTimerId);
+          }
+      };
+
+      refreshWin = function() {
+        setPanel("#{who_is_running}", true);
+        Ext.getCmp(txtSelectedAppId).setValue(null);
+        refreshStatus();
+      };
+
+      Ext.create('Ext.container.Viewport', {
+          layout: {
+              type: 'border',
+              padding: 5
+          },
+          defaults: {
+              split: true
+          },
+          items: [
+              {
+                  region: 'east',
+                  xtype: 'panel',
+                  title: 'Control Panel',
+                  collapsible: true,
+                  layout: 'border',
+                  width: '40%',
+                  split: true,
+                  items: [
+                      apps_tree = Ext.create('Ext.tree.Panel', {
+                          region:'north',
+                          id: treePanelId,
+                          title: 'Apps',
+                          split: true,
+                          rootVisible: true,
+                          collapsible: false,
+                          autoScroll: true,
+                          height: '50%',
+                          store: apps_store,
+                          listeners: {
+                              click: {
+                                  element: 'el',
+                                  fn: function() {
+  //                                    apps_tree.getView().getChecked() => Array,
+                                      Ext.getCmp(txtSelectedAppId).setValue(null);
+                                      if (null != apps_tree.getSelectionModel().getLastSelected()) {
+                                          var selectedNode = apps_tree.getSelectionModel().getLastSelected();
+                                          if (selectedNode.parentNode != null) {
+                                              while (!selectedNode.parentNode.data.root) {
+                                                  selectedNode = selectedNode.parentNode;
+                                              }
+                                              Ext.getCmp(txtSelectedAppId).setValue(selectedNode.data.text);
+                                          }
+                                      }
+                                  }
+                              }
+                          },
+                          dockedItems: [
+                              {
+                                  xtype: 'toolbar',
+                                  dock: 'bottom',
+                                  items: [
+                                      {
+                                          xtype: 'button',
+                                          text    : 'Refresh Apps',
+                                          handler    : function () {
+                                              apps_tree.getStore().load();
+                                          }
+                                      },
+                                      {xtype: 'tbseparator'},
+                                      {
+                                          xtype: 'textfield',
+                                          fieldLabel: 'Selected',
+                                          labelWidth: 50,
+                                          id: txtSelectedAppId,
+                                          readOnly: true,
+                                          size: 15,
+                                          listeners: {
+                                              change: function() {
+                                                  if (Ext.String.trim(this.value) == "") {
+  //                                                    Ext.getCmp(btnsGroupId).setDisabled(true);
+                                                      Ext.getCmp(btnRemoveAppId).setDisabled(true);
+                                                      Ext.getCmp(btnRunAppId).setDisabled(true);
+                                                  } else {
+  //                                                    Ext.getCmp(btnsGroupId).setDisabled(false);
+                                                      Ext.getCmp(btnRemoveAppId).setDisabled(false);
+                                                      Ext.getCmp(btnRunAppId).setDisabled(false);
+                                                  }
+                                              }
+                                          }
+                                      },
+                                      {
+                                          xtype: 'buttongroup',
+                                          id: btnsGroupId,
+                                          title: '',
+                                          columns: 2,
+                                          items: [
+                                              {
+                                                  xtype: 'button',
+                                                  id: btnRemoveAppId,
+                                                  text: 'remove!',
+                                                  disabled: true,
+                                                  handler: function() {
+                                                      Ext.MessageBox.confirm("", "Confirm to remove the app?", function(btn) {
+                                                          if (btn == 'yes') {
+                                                              if (typeof(Ext.getCmp(txtSelectedAppId).value) != "undefined") {
+                                                                  Ext.Ajax.request({
+                                                                      method: 'GET',
+                                                                      timeout: 60 * 1000,
+                                                                      url: 'rm_app',
+                                                                      params: {
+                                                                          name: Ext.getCmp(txtSelectedAppId).value
+                                                                      },
+                                                                      success: function(response) {
+                                                                          var json = Ext.JSON.decode(response.responseText);
+                                                                          switch (json.egg) {
+                                                                              case "ok" :
+                                                                                  apps_tree.getStore().load();
+                                                                                  Ext.getCmp(txtSelectedAppId).setValue(null);
+                                                                                  break;
+                                                                              case "running":
+                                                                                  Ext.MessageBox.alert('ALERT', json.msg);
+                                                                                  break;
+                                                                              default:
+                                                                                  Ext.MessageBox.alert('', json.msg);
+                                                                                  return;
+                                                                          }
+                                                                      }
+                                                                  });
+                                                              } else {
+                                                                  Ext.MessageBox.alert('', 'Please select a app to remove.')
+                                                              }
+                                                          }
+                                                      }, this);
+                                                  }
+                                              },
+                                              {
+                                                  xtype: 'button',
+                                                  id: btnRunAppId,
+                                                  text: 'run!',
+                                                  disabled: true,
+                                                  handler: function() {
+                                                      if (typeof(Ext.getCmp(txtSelectedAppId).value) != "undefined") {
+                                                          running = true; // set running true
+                                                          setPanel(Ext.getCmp(txtSelectedAppId).value, true);
+                                                          Ext.Ajax.request({
+                                                              method: 'GET',
+                                                              timeout: 60 * 1000,
+                                                              url: 'run_app',
+                                                              params: {
+                                                                  name: Ext.getCmp(txtSelectedAppId).value
+                                                              },
+                                                              success: function(response) {
+                                                                  var json = Ext.JSON.decode(response.responseText);
+                                                                  switch (json.egg) {
+                                                                      case "rotten" :
+                                                                          apps_tree.getStore().load();
+                                                                          Ext.getCmp(txtSelectedAppId).setValue(null);
+                                                                          refreshStatus();
+                                                                          break;
+                                                                      default:
+                                                                          running = false;
+                                                                          Ext.MessageBox.alert(json.egg, json.msg);
+                                                                          Ext.getCmp(treePanelId).setTitle("Apps");
+                                                                          Ext.getCmp(btnRunAppId).setText("run!");
+                                                                          Ext.getCmp(btnsGroupId).setDisabled(false);
+                                                                          refreshLog();
+                                                                          return;
+                                                                  }
+                                                              }
+                                                          });
+                                                      } else {
+                                                          Ext.MessageBox.alert('', 'Please select a app to run.')
+                                                      }
+                                                  }
+                                              }
+                                          ]
+                                      }
+                                  ]
+                              }
+                          ]
+                      }),
+                      {
+                          region: 'center',
+                          xtype: 'form',
+                          title: 'Load config',
+                          split: true,
+                          bodyPadding: '10 10 0',
+                          autoHeight: true,
+                          collapsible: true,
+                          fileUpload: true,
+                          labelWidth: 50,
+                          defaults: {
+                              anchor: '95%',
+                              allowBlank: false,
+                              msgTarget: 'side'
+                          },
+                          items:[
+                              {
+                                  xtype: 'textfield',
+                                  fieldLabel: 'YAML Config File',
+                                  inputType: 'file',
+                                  name: 'file_path',
+                                  allowBlank: false,
+                                  emptyText: 'Select a document to upload...',
+                                  buttonText: 'Browse'
+                              },
+                              {
+                                  xtype: 'button',
+                                  text: 'upload',
+                                  handler: function() {
+                                      var form = this.up('form').getForm();
+                                      if (form.isValid()) {
+                                          form.submit({
+                                              url: 'cfg_upload',
+                                              waitTitle : '',
+                                              waitMsg: 'Uploading your config file ...',
+                                              success: function(form, action) {
+                                                  switch (action.result.egg) {
+                                                      case 1 : apps_tree.getStore().load();break;
+                                                      case 0 : Ext.MessageBox.alert('', action.result.msg);break;
+                                                      default : Ext.MessageBox.alert('Please check your config file', action.result.msg);
+                                                  }
+                                              },
+                                              failure: function(form, action) {
+
+                                              }
+                                          });
+                                      }
+                                  }
+
+                              }
+                          ]
+                      }
+                  ],
+                  bbar: {
+                      xtype: 'toolbar',
+                      items: [
+                          {
+                              xtype: 'button',
+                              text: 'logout',
+                              handler: function() {
+                                  window.location = '/logout';
+                              }
+                          }
+                      ]
+                  }
+              }
+          ,{
+              region: 'center',
+              title: 'RottenEgg',
+              layout: 'border',
+              items: [
+                  {
+                      xtype: 'grid',
+                      region: 'center',
+                      id: gridId,
+                      store: files_store,
+                      columns: [
+                          { text: 'ActionMode',  dataIndex:'action', align: 'center', width: 100 },
+                          { text: 'Filename',  dataIndex:'filename', align: 'left', width: 500 },
+                          { text: 'Status',  dataIndex:'status', align:'center', width: 100, renderer: function(value){
+                              switch (value) {
+                                  case "success":  return '<span style="color:green">uploaded</span>';
+                                  case "failed" :  return '<span style="color:red">failed</span>';
+                                  default: return 'pending'
+                              }
+                          }}
+                      ],
+                      bbar: {
+                              xtype: 'pagingtoolbar',
+                              store: files_store,
+                              dock: 'bottom',
+                              emptyMsg: 'no files',
+                              displayInfo: true,
+                              items: [ '- ActionMode',
+                                  {
+                                      xtype: 'combo',
+                                      id: comboActionModeId,
+                                      width: 80,
+                                      mode: 'local',
+                                      editable: false,
+                                      store: [
+                                          ['M', 'Modified'],
+                                          ['A', 'Added'],
+                                          ['D', 'Deleted'],
+                                          ['ALL', 'All']
+                                      ],
+                                      value: 'ALL',
+                                      listeners: {
+                                          change: function() {
+                                              files_store.getProxy().extraParams.action_mode = this.getValue();
+                                          }
+                                      }
+                                  },
+                                      '- Status',
+                                  {
+                                      xtype: 'combo',
+                                      id: comboStatusId,
+                                      width: 80,
+                                      mode: 'local',
+                                      editable: false,
+                                      store: [
+                                          ['pending', 'Pending'],
+                                          ['success', 'Uploaded'],
+                                          ['failed', 'Failed'],
+                                          ['ALL', 'All']
+                                      ],
+                                      value: 'ALL',
+                                      listeners: {
+                                          change: function() {
+                                              files_store.getProxy().extraParams.status = this.getValue();
+                                          }
+                                      }
+                                  },
+                                  {
+                                      xtype: 'button',
+                                      text: 'Filter',
+                                      iconCls: 'btn-search',
+                                      handler: function() {
+                                          files_store.getProxy().extraParams.action_mode = Ext.getCmp(comboActionModeId).getValue();
+                                          files_store.getProxy().extraParams.status = Ext.getCmp(comboStatusId).getValue();
+                                          loadFiles();
+                                      }
+                                  }
+                              ]
+                          }
+
+                  },
+                  {
+                      region: 'south',
+                      height: 150,
+                      split: true,
+                      collapsible: true,
+                      title: 'Messages',
+                      layout: 'fit',
+                      items: {
+                          xtype: 'textarea',
+                          id: logWinId,
+                          readOnly: true
+                      },
+                      bbar: {
+                          xtype: 'toolbar',
+                          items: [
+                              {
+                                  xtype: 'button',
+                                  text: 'Clear!',
+                                  handler: function() {
+                                      Ext.getCmp(logWinId).setValue('');
+                                  }
+                              }
+                          ]
+                      }
+                  }
+
+              ]
+          }],
+          listeners: {
+              afterrender: #{!who_is_running.empty? ? "refreshWin" : "loadFiles" }
+          }
+      });
+
+  });

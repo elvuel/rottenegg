@@ -1,0 +1,8 @@
+%html{:xmlns=> "http://www.w3.org/1999/xhtml", 'xml:lang' => "en", :lang => "en"}
+  %head
+    %meta{'http-equiv' => "Content-Type", 'content' => "text/html; charset=utf-8"}
+    %link{'rel' => "stylesheet", 'type' => "text/css", 'href' => "/javascripts/extjs4/resources/css/ext-all.css"}
+    = javascript_include_tag "extjs4/ext-all"
+    %title rotten_egg
+  %body
+    = yield

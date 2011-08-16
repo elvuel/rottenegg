@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+
+require 'rotten_egg'
+RottenEgg::Server.start

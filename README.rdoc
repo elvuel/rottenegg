@@ -1,0 +1,47 @@
+== RottenEgg
+
+RottenEgg is a tool to upload SCM(svn|git) files via FTP.
+
+== Required ruby version
+
+~>= 1.8.7
+
+== Installation
+For <b>Non-Windows</b> install
+    gem install rottenegg
+
+For <b>Windows</b> install,maybe need DevelopmentKit[https://github.com/oneclick/rubyinstaller/wiki/Development-Kit], follow the instructions.
+    install thin:
+        gem install rack
+        gem install eventmachine
+        gem install thin --platform=mswin32
+    install tmail:
+        gem install tmail
+    finally:
+        gem install rottenegg
+
+== Getting Started
+
+First, make sure you can use <b>git</b> or <b>svn</b> command under the console.
+
+=== 1. Generate the config file
+
+    rottenegg_gen git
++or+
+    rottenegg_gen svn
+
+Then update the configuration you want.
+
+=== 2. Generate the auth file for login user
+
+    rottenegg_gen auth
+
+If skip this step, will default 'rotten' and 'egg' as login user and password.
+
+=== 3. Start & Scroll
+
+rottenegg -h for help.
+
+    rottenegg -C path/to/config.yml -A path/to/auth.yml -W path/to/working_directory
+
+http://localhost:14720/login

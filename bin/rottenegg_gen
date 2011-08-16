@@ -1,0 +1,55 @@
+#!/usr/bin/env ruby
+INTRO =<<_PLAIN_
+# name is unique!
+# scm(svn).sanitize_path_prefix split with '|'
+_PLAIN_
+
+SVN =<<_YAML_
+scm:
+  tool: svn
+  repository: /path/to/repository
+  sanitize_path_prefix: /repos/projects/release/|/some/path/projects/trunk/
+  remote_version_file: ftproot/path/to/version.txt
+#  username: svn_account
+#  password: svn_password
+_YAML_
+
+GIT =<<_YAML_
+scm:
+  tool: git
+  branch: master
+  repository: /path/to/repository
+  remote_version_file: ftproot/path/to/version.txt
+_YAML_
+
+FTP =<<_YAML_
+ftp:
+    host: www.examples.com
+    port: 21
+    user: username
+    password: password
+    passive: false
+    verbose: true
+name: rottenegg
+_YAML_
+
+AUTH =<<_AUTH_
+user: name
+password: password
+_AUTH_
+
+case ARGV.join
+  when "svn"
+    section = "config"
+    File.open("#{ENV["PWD"]}/#{section}.yml", "w") { |f| f.write(INTRO + SVN + FTP)  }
+  when "git"
+    section = "config"
+    File.open("#{ENV["PWD"]}/#{section}.yml", "w") { |f| f.write(INTRO + GIT + FTP)  }
+  when "auth"
+    section = "auth"
+    File.open("#{ENV["PWD"]}/#{section}.yml", "w") { |f| f.write AUTH  }
+  else
+    abort "'#{__FILE__}' need one of [git|svn|auth]"
+end
+
+puts "#{ENV["PWD"]}/#{section}.yml generated!"

@@ -1,0 +1,108 @@
+-#= javascript_include_tag 'login'
+:javascript
+  Ext.require([
+      'Ext.form.*',
+      'Ext.tip.*',
+      'Ext.window.MessageBox',
+      'Ext.window.Window'
+  ]);
+
+  Ext.onReady(function() {
+      Ext.QuickTips.init();
+      var form = Ext.create('Ext.form.Panel', {
+          id: 'form_login',
+          border: true,
+          fieldDefaults: {
+              labelWidth: 55
+          },
+          url: 'authenticate',
+          defaultType: 'textfield',
+          bodyPadding: 20,
+
+          items: [
+              {
+                  fieldLabel: 'User',
+                  id: 'username',
+                  name: 'username',
+                  allowBlank: false,
+                  anchor:'100%'
+              },
+              {
+                  fieldLabel: 'Password',
+                  id: 'password',
+                  name: 'password',
+                  allowBlank: false,
+                  inputType: 'password',
+                  anchor: '100%'
+              }
+          ],
+          buttons: [
+              {
+                  text: 'Reset',
+                  id: 'btn_reset',
+                  handler: function() {
+                      this.up('form').getForm().reset();
+                  }
+              },
+              {
+                  text: 'Login',
+                  id: "btn_login",
+                  formBind: true, //only enabled once the form is valid
+                  disabled: true,
+                  handler: function() {
+                      var form = Ext.getCmp("form_login").form;
+                      if (form.wasValid) {
+                          form.submit({
+                              waitTitle : '',
+                              waitMsg : 'loading',
+                              success: function(form, action) {
+                                  if (action.result.msg == "logged in") {
+                                      window.location = '/';
+                                  } else {
+                                      Ext.MessageBox.alert('Login Failed', 'Username or password error');
+                                  }
+                              },
+                              failure: function(form, action) {
+                                  if (action.failureType == 'server') {
+                                      Ext.MessageBox.alert('Login Failed', 'Username or password error');
+                                  } else if (action.failureType == 'connect') {
+                                      Ext.Msg.alert('Exception: Response Status[' + action.response.status + ']', action.response.statusText);
+                                  } else if (action.failureType == 'client') {
+                                      Ext.Msg.alert('Exception:', 'client error');
+                                  } else {
+                                      Ext.MessageBox.alert('Exception', action.response.responseText);
+                                  }
+                              }
+                          });
+                      }
+                  }
+              }
+          ]
+      });
+
+      new Ext.KeyMap(Ext.getDoc(), {
+          key:Ext.EventObject.ENTER,
+          fn: function(e) {
+              if (Ext.getCmp("form_login").form.wasValid) {
+                  Ext.getCmp("btn_login").handler.call(Ext.getCmp("btn_login").scope);
+              } else {
+                  Ext.getCmp('username').focus();
+              }
+          },
+          scope : form
+      });
+
+      var win = Ext.create('Ext.window.Window', {
+          title: 'Manager login',
+          height: 150,
+          width: 400,
+          collapsible: true,
+          resizable: false,
+          closable: false,
+          layout: 'fit',
+          draggable: false,
+          items: form
+      });
+  //    win.show().collapse(false);// collapsed!
+     win.show();
+  });
